@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: WooCommerce LINE Messaging
- * Plugin URI: https://your-website.com
+ * Plugin URI: https://github.com/dcde22345/woocommerce_line_messaging
  * Description: 整合 LINE Login 與 LINE Messaging API，在 WooCommerce 訂單建立時發送 LINE 通知給客戶
  * Version: 1.0.0
  * Author: Hank Tsai
@@ -60,6 +60,16 @@ function wlm_check_requirements() {
 }
 
 /**
+ * 宣告與 WooCommerce HPOS 的相容性
+ */
+function wlm_declare_compatibility() {
+    if (class_exists('\Automattic\WooCommerce\Utilities\FeaturesUtil')) {
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
+    }
+}
+add_action('before_woocommerce_init', 'wlm_declare_compatibility');
+
+/**
  * 載入外掛核心檔案
  */
 function wlm_load_plugin() {
@@ -105,8 +115,83 @@ function wlm_activate() {
     
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta($sql);
+    
+    // 自動同步所有現有的 LINE Login 使用者
+    wlm_sync_existing_line_users_on_activation();
 }
 register_activation_hook(__FILE__, 'wlm_activate');
+
+/**
+ * 啟用時同步現有的 LINE 使用者
+ */
+function wlm_sync_existing_line_users_on_activation() {
+    global $wpdb;
+    
+    // 查詢所有有 Line_userId 的使用者（Super Socializer 儲存的欄位）
+    $line_users = $wpdb->get_results(
+        "SELECT user_id, meta_value as line_user_id 
+         FROM {$wpdb->usermeta} 
+         WHERE meta_key = 'Line_userId'"
+    );
+    
+    if (empty($line_users)) {
+        return;
+    }
+    
+    $table_name = $wpdb->prefix . 'wlm_line_users';
+    $synced_count = 0;
+    
+    foreach ($line_users as $user) {
+        // 獲取其他 LINE 相關資料
+        $line_display_name = get_user_meta($user->user_id, 'Line_displayName', true);
+        $line_picture_url = get_user_meta($user->user_id, 'Line_pictureUrl', true);
+        
+        // 檢查是否已存在
+        $existing = $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM $table_name WHERE user_id = %d",
+            $user->user_id
+        ));
+        
+        if ($existing) {
+            // 更新現有記錄
+            $wpdb->update(
+                $table_name,
+                array(
+                    'line_user_id' => $user->line_user_id,
+                    'line_display_name' => $line_display_name,
+                    'line_picture_url' => $line_picture_url,
+                    'updated_at' => current_time('mysql')
+                ),
+                array('user_id' => $user->user_id),
+                array('%s', '%s', '%s', '%s'),
+                array('%d')
+            );
+        } else {
+            // 插入新記錄
+            $wpdb->insert(
+                $table_name,
+                array(
+                    'user_id' => $user->user_id,
+                    'line_user_id' => $user->line_user_id,
+                    'line_display_name' => $line_display_name,
+                    'line_picture_url' => $line_picture_url
+                ),
+                array('%d', '%s', '%s', '%s')
+            );
+        }
+        
+        // 同時儲存到 user meta 作為備份
+        update_user_meta($user->user_id, 'line_user_id', $user->line_user_id);
+        update_user_meta($user->user_id, 'line_display_name', $line_display_name);
+        update_user_meta($user->user_id, 'line_picture_url', $line_picture_url);
+        
+        $synced_count++;
+    }
+    
+    // 儲存同步結果，供管理後台顯示
+    update_option('wlm_activation_sync_count', $synced_count);
+    update_option('wlm_activation_sync_time', current_time('mysql'));
+}
 
 /**
  * 外掛停用時的處理

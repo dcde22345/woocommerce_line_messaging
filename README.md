@@ -39,6 +39,16 @@
 4. 找到「WooCommerce LINE Messaging」並點擊「啟用」
 5. 前往 WooCommerce > LINE 訊息通知 進行設定
 
+### 啟用時自動執行
+
+外掛啟用時會自動執行以下操作：
+
+1. **建立專用資料表** `wp_wlm_line_users` 儲存 LINE 使用者資料
+2. **自動同步現有使用者** 如果您的網站已經有使用者透過 Super Socializer 的 LINE Login 登入過，外掛會自動將這些使用者的 LINE ID 同步到資料庫
+3. **顯示同步結果** 在設定頁面會顯示同步了多少位使用者
+
+您不需要手動執行任何同步操作，啟用外掛後即可立即使用！
+
 ## 設定步驟
 
 ### 1. 建立 LINE Messaging API Channel
@@ -76,9 +86,11 @@
 
 ### 管理員功能
 
-1. 查看已連結 LINE 的使用者列表
-2. 測試 Channel Access Token 是否有效
-3. 發送測試訊息給指定使用者
+1. **自動同步**：啟用外掛時自動同步所有現有的 LINE Login 使用者
+2. **查看使用者列表**：查看已連結 LINE 的使用者列表及其資訊
+3. **測試 Token**：測試 Channel Access Token 是否有效
+4. **發送測試訊息**：發送測試訊息給指定使用者
+5. **重新同步**：如有需要，可手動重新同步所有 LINE 使用者
 
 ## 訊息範例
 
@@ -167,6 +179,34 @@ woocommerce-line-messaging/
 
 - `wlm_order_message` - 修改訂單通知訊息內容
 - `wlm_status_change_message` - 修改狀態更新訊息內容
+
+## 安全性
+
+### 保護措施
+
+本外掛已實施多項安全措施保護您的敏感資料：
+
+1. **API Keys 隱藏**：Channel Access Token 和 Secret 使用密碼欄位，預設隱藏
+2. **遮罩顯示**：敏感資料以部分遮罩方式顯示
+3. **權限檢查**：所有管理功能都需要 `manage_woocommerce` 權限
+4. **日誌過濾**：預設不記錄完整 API 回應，避免洩漏敏感資訊
+5. **使用者隱私**：LINE User ID 預設遮罩顯示，需手動點擊才能查看
+
+### 安全建議
+
+1. **正式環境請關閉除錯模式**：
+   ```php
+   define('WP_DEBUG', false);
+   define('WP_DEBUG_LOG', false);
+   ```
+
+2. **保護 debug.log 檔案**：確保 `wp-content/debug.log` 無法從外部訪問
+
+3. **定期更換 Token**：建議定期更換 LINE Channel Access Token
+
+4. **最小權限原則**：只給予必要人員 WooCommerce 管理權限
+
+詳細的安全說明請參閱 [SECURITY.md](SECURITY.md)
 
 ## 授權
 

@@ -57,11 +57,25 @@ class WLM_User_Data_Handler {
      */
     public static function handle_wp_login($user_login, $user) {
         // 嘗試從 user meta 獲取 LINE 資料
-        $line_user_id = get_user_meta($user->ID, 'line_user_id', true);
+        // Super Socializer 使用 Line_userId (注意大小寫)
+        $line_user_id = get_user_meta($user->ID, 'Line_userId', true);
+        
+        // 如果沒有找到，嘗試從我們自己儲存的欄位讀取
+        if (empty($line_user_id)) {
+            $line_user_id = get_user_meta($user->ID, 'line_user_id', true);
+        }
         
         if (!empty($line_user_id)) {
-            $line_display_name = get_user_meta($user->ID, 'line_display_name', true);
-            $line_picture_url = get_user_meta($user->ID, 'line_picture_url', true);
+            // Super Socializer 可能使用的欄位名稱
+            $line_display_name = get_user_meta($user->ID, 'Line_displayName', true);
+            if (empty($line_display_name)) {
+                $line_display_name = get_user_meta($user->ID, 'line_display_name', true);
+            }
+            
+            $line_picture_url = get_user_meta($user->ID, 'Line_pictureUrl', true);
+            if (empty($line_picture_url)) {
+                $line_picture_url = get_user_meta($user->ID, 'line_picture_url', true);
+            }
             
             self::save_line_user_data($user->ID, $line_user_id, $line_display_name, $line_picture_url);
         }
@@ -139,7 +153,13 @@ class WLM_User_Data_Handler {
         
         // 如果資料表中沒有，嘗試從 user meta 獲取
         if (empty($line_user_id)) {
-            $line_user_id = get_user_meta($user_id, 'line_user_id', true);
+            // 優先使用 Super Socializer 的欄位 Line_userId
+            $line_user_id = get_user_meta($user_id, 'Line_userId', true);
+            
+            // 如果還是沒有，嘗試從我們自己儲存的欄位讀取
+            if (empty($line_user_id)) {
+                $line_user_id = get_user_meta($user_id, 'line_user_id', true);
+            }
         }
         
         return $line_user_id ?: null;
@@ -161,6 +181,54 @@ class WLM_User_Data_Handler {
         ));
         
         return $data ?: null;
+    }
+    
+    /**
+     * 同步所有 Super Socializer 的 LINE 使用者到我們的資料表
+     * 這個函數可以在管理後台手動執行
+     *
+     * @return array 同步結果 array('success' => count, 'failed' => count)
+     */
+    public static function sync_existing_line_users() {
+        global $wpdb;
+        
+        $success_count = 0;
+        $failed_count = 0;
+        
+        // 查詢所有有 Line_userId 的使用者
+        $line_users = $wpdb->get_results(
+            "SELECT user_id, meta_value as line_user_id 
+             FROM {$wpdb->usermeta} 
+             WHERE meta_key = 'Line_userId'"
+        );
+        
+        if (empty($line_users)) {
+            return array('success' => 0, 'failed' => 0, 'message' => '沒有找到使用 LINE Login 的使用者');
+        }
+        
+        foreach ($line_users as $user) {
+            $line_display_name = get_user_meta($user->user_id, 'Line_displayName', true);
+            $line_picture_url = get_user_meta($user->user_id, 'Line_pictureUrl', true);
+            
+            $result = self::save_line_user_data(
+                $user->user_id,
+                $user->line_user_id,
+                $line_display_name,
+                $line_picture_url
+            );
+            
+            if ($result) {
+                $success_count++;
+            } else {
+                $failed_count++;
+            }
+        }
+        
+        return array(
+            'success' => $success_count,
+            'failed' => $failed_count,
+            'message' => "成功同步 {$success_count} 位使用者，失敗 {$failed_count} 位"
+        );
     }
 }
 

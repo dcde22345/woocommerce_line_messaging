@@ -75,16 +75,26 @@ class WLM_LINE_Messaging {
         $response_code = wp_remote_retrieve_response_code($response);
         $response_body = wp_remote_retrieve_body($response);
         
-        // 記錄日誌
+        // 記錄日誌（不記錄完整 response body 以保護隱私）
         $this->log_message('Response Code: ' . $response_code);
-        $this->log_message('Response Body: ' . $response_body);
+        
+        // 只在開發模式且明確啟用時才記錄完整回應
+        if (defined('WLM_DEBUG_VERBOSE') && WLM_DEBUG_VERBOSE) {
+            $this->log_message('Response Body: ' . $response_body);
+        } else {
+            $this->log_message('Response: ' . ($response_code === 200 ? 'Success' : 'Failed'));
+        }
         
         if ($response_code !== 200) {
-            return new WP_Error(
-                'api_error',
-                'LINE API 錯誤: ' . $response_code,
-                array('response' => $response_body)
-            );
+            // 解析錯誤訊息，但不暴露完整 response
+            $error_data = json_decode($response_body, true);
+            $error_message = 'LINE API 錯誤: ' . $response_code;
+            
+            if (isset($error_data['message'])) {
+                $error_message .= ' - ' . $error_data['message'];
+            }
+            
+            return new WP_Error('api_error', $error_message);
         }
         
         return true;

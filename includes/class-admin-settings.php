@@ -111,9 +111,33 @@ class WLM_Admin_Settings {
      * 渲染設定頁面
      */
     public static function render_settings_page() {
+        // 每次開啟頁面時自動同步 LINE 使用者
+        $sync_result = WLM_User_Data_Handler::sync_existing_line_users();
+        
+        // 顯示啟用時的同步結果（只顯示一次）
+        $sync_count = get_option('wlm_activation_sync_count', 0);
+        $sync_time = get_option('wlm_activation_sync_time', '');
+        
         ?>
         <div class="wrap">
             <h1>WooCommerce LINE 訊息通知設定</h1>
+            
+            <?php if ($sync_count > 0 && $sync_time): ?>
+            <div class="notice notice-success is-dismissible">
+                <p>
+                    <strong>外掛啟用時已自動同步：</strong>
+                    成功同步 <?php echo esc_html($sync_count); ?> 位 LINE 使用者
+                    （同步時間：<?php echo esc_html($sync_time); ?> ）
+                </p>
+            </div>
+            <?php 
+                // 顯示一次後就清除，避免一直顯示
+                if (isset($_GET['settings-updated'])) {
+                    delete_option('wlm_activation_sync_count');
+                    delete_option('wlm_activation_sync_time');
+                }
+            endif; 
+            ?>
             
             <form method="post" action="options.php">
                 <?php
@@ -149,6 +173,29 @@ class WLM_Admin_Settings {
             <hr>
             
             <h2>LINE 使用者資料</h2>
+            <p>每次開啟此頁面時會自動同步最新的 LINE 使用者資料</p>
+            
+            <!-- 搜尋表單 -->
+            <form method="get" action="">
+                <input type="hidden" name="page" value="wlm-settings">
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">搜尋使用者</th>
+                        <td>
+                            <input type="text" 
+                                   name="wlm_search_email" 
+                                   value="<?php echo isset($_GET['wlm_search_email']) ? esc_attr($_GET['wlm_search_email']) : ''; ?>" 
+                                   placeholder="輸入使用者 Email" 
+                                   style="width: 300px;">
+                            <button type="submit" class="button">搜尋</button>
+                            <?php if (isset($_GET['wlm_search_email']) && !empty($_GET['wlm_search_email'])): ?>
+                                <a href="?page=wlm-settings" class="button">清除搜尋</a>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                </table>
+            </form>
+            
             <?php self::render_line_users_table(); ?>
         </div>
         <?php
@@ -173,8 +220,19 @@ class WLM_Admin_Settings {
      */
     public static function render_channel_access_token_field() {
         $value = get_option('wlm_line_channel_access_token', '');
-        echo '<input type="text" name="wlm_line_channel_access_token" value="' . esc_attr($value) . '" class="regular-text" />';
-        echo '<p class="description">從 LINE Developers Console 取得的 Channel Access Token（長期）</p>';
+        $masked_value = !empty($value) ? substr($value, 0, 10) . '...' . substr($value, -10) : '';
+        ?>
+        <input type="password" 
+               name="wlm_line_channel_access_token" 
+               value="<?php echo esc_attr($value); ?>" 
+               class="regular-text" 
+               placeholder="<?php echo $masked_value ? '已設定 (點擊顯示)' : '輸入 Channel Access Token'; ?>" />
+        <button type="button" class="button" onclick="var input=this.previousElementSibling; input.type=input.type==='password'?'text':'password'; this.textContent=input.type==='password'?'顯示':'隱藏';">顯示</button>
+        <?php if ($masked_value): ?>
+            <p class="description">目前值：<code><?php echo esc_html($masked_value); ?></code></p>
+        <?php endif; ?>
+        <p class="description">從 LINE Developers Console 取得的 Channel Access Token（長期）</p>
+        <?php
     }
     
     /**
@@ -182,8 +240,19 @@ class WLM_Admin_Settings {
      */
     public static function render_channel_secret_field() {
         $value = get_option('wlm_line_channel_secret', '');
-        echo '<input type="text" name="wlm_line_channel_secret" value="' . esc_attr($value) . '" class="regular-text" />';
-        echo '<p class="description">從 LINE Developers Console 取得的 Channel Secret</p>';
+        $masked_value = !empty($value) ? substr($value, 0, 4) . str_repeat('*', strlen($value) - 8) . substr($value, -4) : '';
+        ?>
+        <input type="password" 
+               name="wlm_line_channel_secret" 
+               value="<?php echo esc_attr($value); ?>" 
+               class="regular-text" 
+               placeholder="<?php echo $masked_value ? '已設定 (點擊顯示)' : '輸入 Channel Secret'; ?>" />
+        <button type="button" class="button" onclick="var input=this.previousElementSibling; input.type=input.type==='password'?'text':'password'; this.textContent=input.type==='password'?'顯示':'隱藏';">顯示</button>
+        <?php if ($masked_value): ?>
+            <p class="description">目前值：<code><?php echo esc_html($masked_value); ?></code></p>
+        <?php endif; ?>
+        <p class="description">從 LINE Developers Console 取得的 Channel Secret</p>
+        <?php
     }
     
     /**
@@ -232,11 +301,44 @@ class WLM_Admin_Settings {
         global $wpdb;
         $table_name = $wpdb->prefix . 'wlm_line_users';
         
-        $results = $wpdb->get_results("SELECT * FROM $table_name ORDER BY created_at DESC LIMIT 50");
+        // 檢查是否有搜尋條件
+        $search_email = isset($_GET['wlm_search_email']) ? sanitize_email($_GET['wlm_search_email']) : '';
+        
+        if (!empty($search_email)) {
+            // 先找到符合 email 的使用者
+            $user = get_user_by('email', $search_email);
+            
+            if ($user) {
+                // 根據 user_id 查詢
+                $results = $wpdb->get_results($wpdb->prepare(
+                    "SELECT * FROM $table_name WHERE user_id = %d ORDER BY created_at DESC",
+                    $user->ID
+                ));
+            } else {
+                $results = array();
+            }
+            
+            if (empty($results)) {
+                echo '<div class="notice notice-warning"><p>找不到 Email 為 <strong>' . esc_html($search_email) . '</strong> 的 LINE 使用者</p></div>';
+                return;
+            }
+        } else {
+            // 沒有搜尋條件，顯示最新 5 筆
+            $results = $wpdb->get_results("SELECT * FROM $table_name ORDER BY created_at DESC LIMIT 5");
+        }
         
         if (empty($results)) {
             echo '<p>目前沒有 LINE 使用者資料。</p>';
+            echo '<p><small>使用者需要透過 Super Socializer 的 LINE Login 登入後，資料才會顯示在這裡。</small></p>';
             return;
+        }
+        
+        // 顯示結果數量
+        $total_count = $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
+        if (empty($search_email)) {
+            echo '<p><small>顯示最新 ' . count($results) . ' 筆，共 ' . $total_count . ' 筆資料</small></p>';
+        } else {
+            echo '<p><small>找到 ' . count($results) . ' 筆符合的資料</small></p>';
         }
         
         echo '<table class="wp-list-table widefat fixed striped">';
