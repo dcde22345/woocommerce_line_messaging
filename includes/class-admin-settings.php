@@ -459,10 +459,14 @@ class WLM_Admin_Settings {
             wp_send_json_error('Channel Access Token 未設定，請先設定 Token');
         }
         
+        // 建立測試用的 Flex Message（使用假資料）
+        $test_message = WLM_Order_Flex_Message::create_test_message();
+        
         $line_messaging = new WLM_LINE_Messaging();
-        $result = $line_messaging->send_text_message(
+        $result = $line_messaging->send_flex_message(
             $line_user_id,
-            "這是一則測試訊息\n來自 WooCommerce LINE Messaging 外掛"
+            '測試訊息 - 訂單建立成功通知',
+            $test_message
         );
         
         if (is_wp_error($result)) {

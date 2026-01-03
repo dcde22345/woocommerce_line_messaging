@@ -83,6 +83,9 @@ function wlm_load_plugin() {
     require_once WLM_PLUGIN_DIR . 'includes/class-admin-settings.php';
     require_once WLM_PLUGIN_DIR . 'includes/class-user-data-handler.php';
     
+    // 載入訊息格式類別
+    require_once WLM_PLUGIN_DIR . 'includes/messages/class-order-flex-message.php';
+    
     // 初始化管理設定
     WLM_Admin_Settings::init();
     
