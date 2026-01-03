@@ -404,16 +404,23 @@ class WLM_Admin_Settings {
         
         $token = get_option('wlm_line_channel_access_token', '');
         
+        error_log('[WLM] 測試 Token - Token 長度: ' . strlen($token));
+        
         if (empty($token)) {
+            error_log('[WLM] Token 為空');
             wp_send_json_error('請先設定 Channel Access Token');
         }
         
         $result = WLM_LINE_Messaging::verify_token($token);
         
         if (is_wp_error($result)) {
-            wp_send_json_error($result->get_error_message());
+            $error_code = $result->get_error_code();
+            $error_message = $result->get_error_message();
+            error_log('[WLM] Token 驗證失敗 - Code: ' . $error_code . ', Message: ' . $error_message);
+            wp_send_json_error($error_message);
         }
         
+        error_log('[WLM] Token 驗證成功');
         wp_send_json_success('Token 驗證成功');
     }
     
@@ -433,10 +440,23 @@ class WLM_Admin_Settings {
             wp_send_json_error('請輸入 User ID');
         }
         
+        // 記錄除錯資訊
+        error_log('[WLM] 發送測試訊息 - User ID: ' . $user_id);
+        
         $line_user_id = WLM_User_Data_Handler::get_line_user_id($user_id);
         
         if (!$line_user_id) {
-            wp_send_json_error('找不到此使用者的 LINE User ID');
+            error_log('[WLM] 找不到 User ID ' . $user_id . ' 的 LINE User ID');
+            wp_send_json_error('找不到此使用者的 LINE User ID。請確認該使用者是否已使用 LINE Login 登入過。');
+        }
+        
+        error_log('[WLM] 找到 LINE User ID: ' . $line_user_id);
+        
+        // 檢查 Token 是否設定
+        $token = get_option('wlm_line_channel_access_token', '');
+        if (empty($token)) {
+            error_log('[WLM] Channel Access Token 未設定');
+            wp_send_json_error('Channel Access Token 未設定，請先設定 Token');
         }
         
         $line_messaging = new WLM_LINE_Messaging();
@@ -446,9 +466,22 @@ class WLM_Admin_Settings {
         );
         
         if (is_wp_error($result)) {
-            wp_send_json_error($result->get_error_message());
+            $error_code = $result->get_error_code();
+            $error_message = $result->get_error_message();
+            $error_data = $result->get_error_data();
+            
+            error_log('[WLM] 發送訊息失敗 - Code: ' . $error_code . ', Message: ' . $error_message);
+            
+            // 提供更詳細的錯誤訊息
+            $detailed_message = $error_message;
+            if ($error_data && is_array($error_data)) {
+                $detailed_message .= ' (詳細資訊請查看 Console)';
+            }
+            
+            wp_send_json_error($detailed_message);
         }
         
+        error_log('[WLM] 測試訊息發送成功');
         wp_send_json_success('測試訊息已發送');
     }
 }

@@ -90,11 +90,37 @@ class WLM_LINE_Messaging {
             $error_data = json_decode($response_body, true);
             $error_message = 'LINE API 錯誤: ' . $response_code;
             
-            if (isset($error_data['message'])) {
-                $error_message .= ' - ' . $error_data['message'];
+            // 記錄詳細錯誤到日誌
+            $this->log_message('API Error - Code: ' . $response_code . ', Body: ' . $response_body, 'error');
+            
+            // 根據常見的錯誤碼提供更詳細的訊息
+            $common_errors = array(
+                400 => '請求格式錯誤',
+                401 => 'Channel Access Token 無效或已過期',
+                403 => '沒有權限使用此 API',
+                404 => 'API 端點不存在',
+                429 => '請求次數過多，請稍後再試',
+                500 => 'LINE 伺服器錯誤',
+                503 => 'LINE 服務暫時無法使用'
+            );
+            
+            if (isset($common_errors[$response_code])) {
+                $error_message .= ' - ' . $common_errors[$response_code];
             }
             
-            return new WP_Error('api_error', $error_message);
+            if (isset($error_data['message'])) {
+                $error_message .= ' (' . $error_data['message'] . ')';
+            }
+            
+            // 如果是 401 錯誤，提供更明確的建議
+            if ($response_code === 401) {
+                $error_message .= '。請檢查 Token 是否正確，或前往 LINE Developers Console 重新發行 Token。';
+            }
+            
+            return new WP_Error('api_error', $error_message, array(
+                'response_code' => $response_code,
+                'response_body' => $response_body
+            ));
         }
         
         return true;
@@ -170,13 +196,33 @@ class WLM_LINE_Messaging {
         ));
         
         if (is_wp_error($response)) {
+            error_log('[WLM] Token 驗證請求錯誤: ' . $response->get_error_message());
             return $response;
         }
         
         $response_code = wp_remote_retrieve_response_code($response);
+        $response_body = wp_remote_retrieve_body($response);
+        
+        error_log('[WLM] Token 驗證回應 - Code: ' . $response_code);
         
         if ($response_code !== 200) {
-            return new WP_Error('invalid_token', 'Token 驗證失敗');
+            $error_data = json_decode($response_body, true);
+            $error_message = 'Token 驗證失敗 (HTTP ' . $response_code . ')';
+            
+            if (isset($error_data['message'])) {
+                $error_message .= ': ' . $error_data['message'];
+            }
+            
+            error_log('[WLM] Token 驗證失敗 - ' . $error_message);
+            return new WP_Error('invalid_token', $error_message);
+        }
+        
+        // 成功時記錄 Bot 資訊（可選）
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            $bot_info = json_decode($response_body, true);
+            if (isset($bot_info['displayName'])) {
+                error_log('[WLM] Token 驗證成功 - Bot 名稱: ' . $bot_info['displayName']);
+            }
         }
         
         return true;
