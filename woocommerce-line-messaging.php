@@ -77,14 +77,29 @@ function wlm_load_plugin() {
         return;
     }
     
-    // 載入核心類別
-    require_once WLM_PLUGIN_DIR . 'includes/class-line-messaging.php';
-    require_once WLM_PLUGIN_DIR . 'includes/class-order-notifier.php';
-    require_once WLM_PLUGIN_DIR . 'includes/class-admin-settings.php';
-    require_once WLM_PLUGIN_DIR . 'includes/class-user-data-handler.php';
+    // 載入共用類別
+    require_once WLM_PLUGIN_DIR . 'includes/common/class-user-data-handler.php';
     
-    // 載入訊息格式類別
-    require_once WLM_PLUGIN_DIR . 'includes/messages/class-order-flex-message.php';
+    // 載入 Messaging 功能
+    require_once WLM_PLUGIN_DIR . 'includes/messaging/class-line-messaging.php';
+    require_once WLM_PLUGIN_DIR . 'includes/messaging/class-order-notifier.php';
+    require_once WLM_PLUGIN_DIR . 'includes/messaging/messages/class-order-flex-message.php';
+    
+    // 載入管理後台
+    require_once WLM_PLUGIN_DIR . 'includes/admin/class-admin-settings.php';
+    
+    // 載入 LINE Login 功能（如果啟用）
+    if (get_option('wlm_line_login_enabled') === 'yes') {
+        require_once WLM_PLUGIN_DIR . 'includes/login/class-line-login.php';
+        require_once WLM_PLUGIN_DIR . 'includes/admin/class-admin-line-login.php';
+        
+        WLM_Line_Login::init();
+        WLM_Admin_Line_Login::init();
+    } else {
+        // 即使未啟用，也載入管理設定頁面
+        require_once WLM_PLUGIN_DIR . 'includes/admin/class-admin-line-login.php';
+        WLM_Admin_Line_Login::init();
+    }
     
     // 初始化管理設定
     WLM_Admin_Settings::init();
