@@ -16,8 +16,8 @@ class WLM_Order_Notifier {
      * 初始化
      */
     public static function init() {
-        // 掛載 WooCommerce 訂單建立完成的 hook
-        add_action('woocommerce_new_order', array(__CLASS__, 'send_order_notification'), 10, 1);
+        // 掛載 WooCommerce 訂單處理完成的 hook（確保商品項目已保存）
+        add_action('woocommerce_checkout_order_processed', array(__CLASS__, 'send_order_notification'), 10, 1);
         
         // 也可以掛載訂單狀態改變的 hook
         add_action('woocommerce_order_status_changed', array(__CLASS__, 'send_status_change_notification'), 10, 4);

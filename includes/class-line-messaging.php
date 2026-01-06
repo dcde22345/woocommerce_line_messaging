@@ -112,6 +112,11 @@ class WLM_LINE_Messaging {
                 $error_message .= ' (' . $error_data['message'] . ')';
             }
             
+            // 如果是 400 錯誤，通常是使用者未加好友
+            if ($response_code === 400) {
+                $error_message .= '。請確認使用者已將 LINE Bot 加為好友。';
+            }
+            
             // 如果是 401 錯誤，提供更明確的建議
             if ($response_code === 401) {
                 $error_message .= '。請檢查 Token 是否正確，或前往 LINE Developers Console 重新發行 Token。';
@@ -122,6 +127,9 @@ class WLM_LINE_Messaging {
                 'response_body' => $response_body
             ));
         }
+        
+        // 記錄成功發送
+        $this->log_message('訊息發送成功 - Response Code: 200', 'info');
         
         return true;
     }

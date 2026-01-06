@@ -1,39 +1,18 @@
 {
-  "order_number": "16787",
-  "payment_method_title": "超商繳費",
-  "order_total": "NT$48,440",
+  "order_id": 2455,
+  "order_number": "2455",
+  "payment_method_title": "下單後請至line查看官方訊息",
+  "order_total": "30",
+  "order_total_formatted": "NT$30",
+  "currency": "TWD",
   "products": [
     {
-      "name": "第五人格 - 3795迴聲",
+      "name": "測試商品 1",
       "quantity": 1
     },
     {
-      "name": "第五人格 - 7590迴聲",
-      "quantity": 1
-    },
-    {
-      "name": "第五人格 - 3036迴聲",
-      "quantity": 1
-    },
-    {
-      "name": "第五人格 - 2277迴聲",
-      "quantity": 1
-    },
-    {
-      "name": "第五人格 - 759迴聲",
-      "quantity": 1
-    },
-    {
-      "name": "第五人格 - 15180迴聲",
-      "quantity": 1
-    },
-    {
-      "name": "第五人格 - 37950迴聲",
-      "quantity": 1
-    },
-    {
-      "name": "第五人格 - 75900迴聲",
-      "quantity": 1
+      "name": "測試商品 2",
+      "quantity": 2
     }
   ]
 }
