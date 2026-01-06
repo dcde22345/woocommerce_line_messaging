@@ -91,6 +91,12 @@ class WLM_User_Data_Handler {
      * @return bool
      */
     public static function save_line_user_data($user_id, $line_user_id, $line_display_name = '', $line_picture_url = '') {
+        // 檢查用戶是否存在
+        if (!self::user_exists($user_id)) {
+            error_log('[WLM] 嘗試為不存在的用戶 (ID: ' . $user_id . ') 保存 LINE 資料');
+            return false;
+        }
+        
         global $wpdb;
         $table_name = $wpdb->prefix . 'wlm_line_users';
         
@@ -143,6 +149,11 @@ class WLM_User_Data_Handler {
      * @return string|null LINE User ID 或 null
      */
     public static function get_line_user_id($user_id) {
+        // 首先檢查 WordPress users 表中是否存在該用戶
+        if (!self::user_exists($user_id)) {
+            return null;
+        }
+        
         global $wpdb;
         $table_name = $wpdb->prefix . 'wlm_line_users';
         
@@ -172,6 +183,11 @@ class WLM_User_Data_Handler {
      * @return object|null LINE 使用者資料物件或 null
      */
     public static function get_line_user_data($user_id) {
+        // 首先檢查 WordPress users 表中是否存在該用戶
+        if (!self::user_exists($user_id)) {
+            return null;
+        }
+        
         global $wpdb;
         $table_name = $wpdb->prefix . 'wlm_line_users';
         
@@ -181,6 +197,34 @@ class WLM_User_Data_Handler {
         ));
         
         return $data ?: null;
+    }
+    
+    /**
+     * 檢查 WordPress 用戶是否存在
+     *
+     * @param int $user_id WordPress User ID
+     * @return bool 用戶是否存在
+     */
+    private static function user_exists($user_id) {
+        if (empty($user_id) || !is_numeric($user_id)) {
+            return false;
+        }
+        
+        // 使用 WordPress 內建函數檢查用戶是否存在
+        $user = get_userdata($user_id);
+        
+        if (!$user || !$user->exists()) {
+            return false;
+        }
+        
+        // 額外檢查：直接查詢資料庫確認用戶存在
+        global $wpdb;
+        $user_exists = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$wpdb->users} WHERE ID = %d",
+            $user_id
+        ));
+        
+        return $user_exists > 0;
     }
     
     /**
@@ -207,6 +251,12 @@ class WLM_User_Data_Handler {
         }
         
         foreach ($line_users as $user) {
+            // 檢查用戶是否還存在於 WordPress users 表中
+            if (!self::user_exists($user->user_id)) {
+                $failed_count++;
+                continue;
+            }
+            
             $line_display_name = get_user_meta($user->user_id, 'Line_displayName', true);
             $line_picture_url = get_user_meta($user->user_id, 'Line_pictureUrl', true);
             

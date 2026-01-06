@@ -122,10 +122,18 @@ class WLM_LINE_Messaging {
                 $error_message .= '。請檢查 Token 是否正確，或前往 LINE Developers Console 重新發行 Token。';
             }
             
-            return new WP_Error('api_error', $error_message, array(
-                'response_code' => $response_code,
-                'response_body' => $response_body
-            ));
+            // 不將 response_body 包含在錯誤資料中，避免洩露敏感資訊
+            // 只在開發模式下記錄完整錯誤
+            if (defined('WLM_DEBUG_VERBOSE') && WLM_DEBUG_VERBOSE) {
+                return new WP_Error('api_error', $error_message, array(
+                    'response_code' => $response_code,
+                    'response_body' => $response_body
+                ));
+            } else {
+                return new WP_Error('api_error', $error_message, array(
+                    'response_code' => $response_code
+                ));
+            }
         }
         
         // 記錄成功發送

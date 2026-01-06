@@ -301,6 +301,9 @@ class WLM_Admin_Settings {
         global $wpdb;
         $table_name = $wpdb->prefix . 'wlm_line_users';
         
+        // 先清理已刪除的用戶資料
+        self::cleanup_deleted_users();
+        
         // 檢查是否有搜尋條件
         $search_email = isset($_GET['wlm_search_email']) ? sanitize_email($_GET['wlm_search_email']) : '';
         
@@ -327,18 +330,26 @@ class WLM_Admin_Settings {
             $results = $wpdb->get_results("SELECT * FROM $table_name ORDER BY created_at DESC LIMIT 5");
         }
         
-        if (empty($results)) {
+        // 過濾掉不存在的用戶
+        $valid_results = array();
+        foreach ($results as $row) {
+            if (self::user_exists($row->user_id)) {
+                $valid_results[] = $row;
+            }
+        }
+        
+        if (empty($valid_results)) {
             echo '<p>目前沒有 LINE 使用者資料。</p>';
             echo '<p><small>使用者需要透過 Super Socializer 的 LINE Login 登入後，資料才會顯示在這裡。</small></p>';
             return;
         }
         
-        // 顯示結果數量
-        $total_count = $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
+        // 顯示結果數量（只計算有效的用戶）
+        $total_count = self::get_valid_line_users_count();
         if (empty($search_email)) {
-            echo '<p><small>顯示最新 ' . count($results) . ' 筆，共 ' . $total_count . ' 筆資料</small></p>';
+            echo '<p><small>顯示最新 ' . count($valid_results) . ' 筆，共 ' . $total_count . ' 筆資料</small></p>';
         } else {
-            echo '<p><small>找到 ' . count($results) . ' 筆符合的資料</small></p>';
+            echo '<p><small>找到 ' . count($valid_results) . ' 筆符合的資料</small></p>';
         }
         
         echo '<table class="wp-list-table widefat fixed striped">';
@@ -353,7 +364,7 @@ class WLM_Admin_Settings {
         echo '</thead>';
         echo '<tbody>';
         
-        foreach ($results as $row) {
+        foreach ($valid_results as $row) {
             $user = get_userdata($row->user_id);
             $user_name = $user ? $user->display_name . ' (' . $user->user_email . ')' : '未知使用者';
             
@@ -368,6 +379,104 @@ class WLM_Admin_Settings {
         
         echo '</tbody>';
         echo '</table>';
+    }
+    
+    /**
+     * 清理已刪除的用戶資料
+     *
+     * @return int 刪除的記錄數
+     */
+    private static function cleanup_deleted_users() {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'wlm_line_users';
+        
+        // 獲取所有 LINE 使用者記錄
+        $all_line_users = $wpdb->get_results("SELECT user_id FROM $table_name");
+        
+        if (empty($all_line_users)) {
+            return 0;
+        }
+        
+        $deleted_count = 0;
+        $user_ids_to_delete = array();
+        
+        foreach ($all_line_users as $line_user) {
+            if (!self::user_exists($line_user->user_id)) {
+                $user_ids_to_delete[] = $line_user->user_id;
+            }
+        }
+        
+        if (!empty($user_ids_to_delete)) {
+            // 確保所有 ID 都是整數並轉義
+            $sanitized_ids = array_map('intval', $user_ids_to_delete);
+            $sanitized_ids = array_map('absint', $sanitized_ids);
+            
+            // 批量刪除不存在的用戶記錄
+            $ids_string = implode(',', $sanitized_ids);
+            $deleted_count = $wpdb->query(
+                "DELETE FROM $table_name WHERE user_id IN ($ids_string)"
+            );
+            
+            if ($deleted_count > 0) {
+                error_log('[WLM] 清理了 ' . $deleted_count . ' 筆已刪除用戶的 LINE 資料');
+            }
+        }
+        
+        return $deleted_count;
+    }
+    
+    /**
+     * 檢查 WordPress 用戶是否存在
+     *
+     * @param int $user_id WordPress User ID
+     * @return bool 用戶是否存在
+     */
+    private static function user_exists($user_id) {
+        if (empty($user_id) || !is_numeric($user_id)) {
+            return false;
+        }
+        
+        // 使用 WordPress 內建函數檢查用戶是否存在
+        $user = get_userdata($user_id);
+        
+        if (!$user || !$user->exists()) {
+            return false;
+        }
+        
+        // 額外檢查：直接查詢資料庫確認用戶存在
+        global $wpdb;
+        $user_exists = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$wpdb->users} WHERE ID = %d",
+            $user_id
+        ));
+        
+        return $user_exists > 0;
+    }
+    
+    /**
+     * 獲取有效的 LINE 使用者數量（只計算 WordPress users 表中存在的用戶）
+     *
+     * @return int 有效的使用者數量
+     */
+    private static function get_valid_line_users_count() {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'wlm_line_users';
+        
+        // 獲取所有 LINE 使用者記錄
+        $all_line_users = $wpdb->get_results("SELECT user_id FROM $table_name");
+        
+        if (empty($all_line_users)) {
+            return 0;
+        }
+        
+        $valid_count = 0;
+        foreach ($all_line_users as $line_user) {
+            if (self::user_exists($line_user->user_id)) {
+                $valid_count++;
+            }
+        }
+        
+        return $valid_count;
     }
     
     /**
@@ -388,7 +497,8 @@ class WLM_Admin_Settings {
         
         wp_localize_script('wlm-admin', 'wlmAdmin', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('wlm_admin_nonce')
+            'nonce' => wp_create_nonce('wlm_admin_nonce'),
+            'debug' => defined('WP_DEBUG') && WP_DEBUG && defined('WLM_DEBUG_VERBOSE') && WLM_DEBUG_VERBOSE
         ));
     }
     
@@ -450,7 +560,10 @@ class WLM_Admin_Settings {
             wp_send_json_error('找不到此使用者的 LINE User ID。請確認該使用者是否已使用 LINE Login 登入過。');
         }
         
-        error_log('[WLM] 找到 LINE User ID: ' . $line_user_id);
+        // 只在開發模式下記錄 LINE User ID
+        if (defined('WP_DEBUG') && WP_DEBUG && defined('WLM_DEBUG_VERBOSE') && WLM_DEBUG_VERBOSE) {
+            error_log('[WLM] 找到 LINE User ID: ' . $line_user_id);
+        }
         
         // 檢查 Token 是否設定
         $token = get_option('wlm_line_channel_access_token', '');

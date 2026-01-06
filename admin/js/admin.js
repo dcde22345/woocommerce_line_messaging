@@ -10,7 +10,9 @@ jQuery(document).ready(function($) {
         spinner.addClass('is-active');
         result.html('');
         
-        console.log('[WLM] 開始測試 Token...');
+        if (typeof wlmAdmin !== 'undefined' && wlmAdmin.debug) {
+            console.log('[WLM] 開始測試 Token...');
+        }
         
         $.ajax({
             url: wlmAdmin.ajaxUrl,
@@ -20,24 +22,33 @@ jQuery(document).ready(function($) {
                 nonce: wlmAdmin.nonce
             },
             success: function(response) {
-                console.log('[WLM] Token 測試回應:', response);
+                // 只在開發模式下記錄詳細資訊
+                if (typeof wlmAdmin !== 'undefined' && wlmAdmin.debug) {
+                    console.log('[WLM] Token 測試回應:', response);
+                }
                 
                 if (response.success) {
-                    console.log('[WLM] ✓ Token 驗證成功');
+                    if (typeof wlmAdmin !== 'undefined' && wlmAdmin.debug) {
+                        console.log('[WLM] ✓ Token 驗證成功');
+                    }
                     result.html('<span style="color: green;">✓ ' + response.data + '</span>');
                 } else {
-                    console.error('[WLM] ✗ Token 驗證失敗:', response.data);
+                    if (typeof wlmAdmin !== 'undefined' && wlmAdmin.debug) {
+                        console.error('[WLM] ✗ Token 驗證失敗');
+                    }
                     result.html('<span style="color: red;">✗ ' + response.data + '</span>');
                 }
             },
             error: function(xhr, status, error) {
-                console.error('[WLM] Token 測試 AJAX 錯誤:', {
-                    status: status,
-                    error: error,
-                    responseText: xhr.responseText,
-                    statusCode: xhr.status
-                });
-                result.html('<span style="color: red;">✗ 發生錯誤 (請查看 Console)</span>');
+                // 不記錄敏感資訊，只記錄基本錯誤
+                if (typeof wlmAdmin !== 'undefined' && wlmAdmin.debug) {
+                    console.error('[WLM] Token 測試 AJAX 錯誤:', {
+                        status: status,
+                        error: error,
+                        statusCode: xhr.status
+                    });
+                }
+                result.html('<span style="color: red;">✗ 發生錯誤，請檢查設定</span>');
             },
             complete: function() {
                 button.prop('disabled', false);
@@ -63,8 +74,10 @@ jQuery(document).ready(function($) {
         spinner.addClass('is-active');
         result.html('');
         
-        console.log('[WLM] 開始發送測試訊息...');
-        console.log('[WLM] User ID:', userId);
+        if (typeof wlmAdmin !== 'undefined' && wlmAdmin.debug) {
+            console.log('[WLM] 開始發送測試訊息...');
+            console.log('[WLM] User ID:', userId);
+        }
         
         $.ajax({
             url: wlmAdmin.ajaxUrl,
@@ -75,32 +88,38 @@ jQuery(document).ready(function($) {
                 user_id: userId
             },
             success: function(response) {
-                console.log('[WLM] 測試訊息回應:', response);
+                if (typeof wlmAdmin !== 'undefined' && wlmAdmin.debug) {
+                    console.log('[WLM] 測試訊息回應:', response);
+                }
                 
                 if (response.success) {
-                    console.log('[WLM] ✓ 測試訊息發送成功');
+                    if (typeof wlmAdmin !== 'undefined' && wlmAdmin.debug) {
+                        console.log('[WLM] ✓ 測試訊息發送成功');
+                    }
                     result.html('<span style="color: green;">✓ ' + response.data + '</span>');
                 } else {
-                    console.error('[WLM] ✗ 測試訊息發送失敗:', response.data);
+                    if (typeof wlmAdmin !== 'undefined' && wlmAdmin.debug) {
+                        console.error('[WLM] ✗ 測試訊息發送失敗');
+                    }
                     result.html('<span style="color: red;">✗ ' + response.data + '</span>');
                 }
             },
             error: function(xhr, status, error) {
-                console.error('[WLM] 測試訊息 AJAX 錯誤:', {
-                    status: status,
-                    error: error,
-                    responseText: xhr.responseText,
-                    statusCode: xhr.status,
-                    fullResponse: xhr
-                });
+                // 不記錄敏感資訊，只記錄基本錯誤
+                if (typeof wlmAdmin !== 'undefined' && wlmAdmin.debug) {
+                    console.error('[WLM] 測試訊息 AJAX 錯誤:', {
+                        status: status,
+                        error: error,
+                        statusCode: xhr.status
+                    });
+                }
                 
-                // 嘗試解析錯誤回應
+                // 嘗試解析錯誤回應，但不記錄完整內容
                 try {
                     var errorResponse = JSON.parse(xhr.responseText);
-                    console.error('[WLM] 錯誤回應內容:', errorResponse);
-                    result.html('<span style="color: red;">✗ 發生錯誤: ' + (errorResponse.data || error) + ' (請查看 Console)</span>');
+                    result.html('<span style="color: red;">✗ 發生錯誤: ' + (errorResponse.data || error) + '</span>');
                 } catch(e) {
-                    result.html('<span style="color: red;">✗ 發生錯誤 (請查看 Console)</span>');
+                    result.html('<span style="color: red;">✗ 發生錯誤，請檢查設定</span>');
                 }
             },
             complete: function() {
