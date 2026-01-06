@@ -100,7 +100,6 @@ if (!defined('ABSPATH')) {
             const ajaxUrl = '<?php echo esc_js(admin_url('admin-ajax.php')); ?>';
             const nonce = '<?php echo esc_js(wp_create_nonce('wlm_line_liff_login')); ?>';
             const redirectUrl = '<?php echo esc_js(isset($_GET['redirect']) ? esc_url_raw($_GET['redirect']) : get_option('wlm_line_login_redirect_url', home_url())); ?>';
-            const openExternal = <?php echo get_option('wlm_line_login_open_external', 'yes') === 'yes' ? 'true' : 'false'; ?>;
             
             const statusEl = document.getElementById('login-status');
             
@@ -172,28 +171,9 @@ if (!defined('ABSPATH')) {
                         setTimeout(() => {
                             const targetUrl = result.data.redirect_url || redirectUrl;
                             
-                            // 如果是 LIFF 環境（在 LINE App 內）
-                            if (liff.isInClient()) {
-                                if (openExternal) {
-                                    // 在外部瀏覽器開啟目標頁面，然後關閉 LIFF 視窗
-                                    liff.openWindow({
-                                        url: targetUrl,
-                                        external: true
-                                    });
-                                    
-                                    // 延遲一下再關閉，確保外部瀏覽器已開啟
-                                    setTimeout(() => {
-                                        liff.closeWindow();
-                                    }, 500);
-                                } else {
-                                    // 在 LIFF 視窗內直接導向（保持 LIFF 環境）
-                                    // 使用 window.location.href 會保持 LIFF 環境
-                                    window.location.href = targetUrl;
-                                }
-                            } else {
-                                // 如果不在 LINE App 內，直接導向
-                                window.location.href = targetUrl;
-                            }
+                            // 在 LIFF 視窗內直接導向（保持 LIFF 環境）
+                            // 使用 window.location.href 會保持 LIFF 環境
+                            window.location.href = targetUrl;
                         }, 1500);
                     } else {
                         updateStatus('登入失敗: ' + (result.data.message || '未知錯誤'), 'error');

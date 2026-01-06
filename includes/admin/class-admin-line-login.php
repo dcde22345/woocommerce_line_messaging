@@ -46,7 +46,6 @@ class WLM_Admin_Line_Login {
         register_setting('wlm_line_login_settings', 'wlm_line_login_auto_create_user');
         register_setting('wlm_line_login_settings', 'wlm_line_login_redirect_url');
         register_setting('wlm_line_login_settings', 'wlm_line_login_verify_token');
-        register_setting('wlm_line_login_settings', 'wlm_line_login_open_external');
     }
     
     /**
@@ -60,7 +59,6 @@ class WLM_Admin_Line_Login {
             update_option('wlm_line_login_auto_create_user', isset($_POST['wlm_line_login_auto_create_user']) ? 'yes' : 'no');
             update_option('wlm_line_login_redirect_url', esc_url_raw($_POST['wlm_line_login_redirect_url']));
             update_option('wlm_line_login_verify_token', isset($_POST['wlm_line_login_verify_token']) ? 'yes' : 'no');
-            update_option('wlm_line_login_open_external', isset($_POST['wlm_line_login_open_external']) ? 'yes' : 'no');
             
             echo '<div class="notice notice-success is-dismissible"><p>設定已儲存</p></div>';
         }
@@ -70,7 +68,6 @@ class WLM_Admin_Line_Login {
         $auto_create = get_option('wlm_line_login_auto_create_user', 'yes');
         $redirect_url = get_option('wlm_line_login_redirect_url', home_url());
         $verify_token = get_option('wlm_line_login_verify_token', 'yes');
-        $open_external = get_option('wlm_line_login_open_external', 'no');
         
         ?>
         <div class="wrap">
@@ -156,25 +153,7 @@ class WLM_Admin_Line_Login {
                                    name="wlm_line_login_redirect_url" 
                                    value="<?php echo esc_url($redirect_url); ?>" 
                                    class="regular-text">
-                            <p class="description">LINE Login 成功後要導向的網址（預設：網站首頁）</p>
-                        </td>
-                    </tr>
-                    
-                    <tr>
-                        <th scope="row">
-                            <label for="wlm_line_login_open_external">在外部瀏覽器開啟</label>
-                        </th>
-                        <td>
-                            <input type="checkbox" 
-                                   id="wlm_line_login_open_external" 
-                                   name="wlm_line_login_open_external" 
-                                   value="yes" 
-                                   <?php checked($open_external, 'yes'); ?>>
-                            <p class="description">
-                                啟用後，在 LINE App 內登入成功後會在外部瀏覽器開啟目標頁面，然後關閉 LIFF 視窗。
-                                停用則會在 LIFF 視窗內直接導向，讓使用者繼續在 LINE App 內使用網站。
-                                預設為停用（在 LIFF 視窗內繼續使用）。
-                            </p>
+                            <p class="description">LINE Login 成功後要導向的網址（預設：網站首頁）。登入後會在 LIFF 視窗內直接導向，讓使用者繼續在 LINE App 內使用網站。</p>
                         </td>
                     </tr>
                 </table>
