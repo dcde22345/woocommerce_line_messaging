@@ -188,12 +188,17 @@ if (!defined('ABSPATH')) {
                         
                         // 延遲一下讓使用者看到成功訊息
                         setTimeout(() => {
-                            const targetUrl = result.data.redirect_url || redirectUrl;
+                            let targetUrl = result.data.redirect_url || redirectUrl;
+                            
+                            // 加上 timestamp 參數避免快取
+                            const separator = targetUrl.indexOf('?') !== -1 ? '&' : '?';
+                            const timestamp = Date.now();
+                            targetUrl = targetUrl + separator + 'ts=' + timestamp;
                             
                             // 在 LIFF 視窗內直接導向（保持 LIFF 環境）
                             // 使用 window.location.href 會保持 LIFF 環境
                             window.location.href = targetUrl;
-                        }, 1500);
+                        }, 500);
                     } else {
                         updateStatus('登入失敗: ' + (result.data.message || '未知錯誤'), 'error');
                         
