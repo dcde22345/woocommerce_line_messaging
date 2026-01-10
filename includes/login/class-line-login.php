@@ -44,6 +44,7 @@ class WLM_Line_Login {
         $line_user_id = isset($_POST['line_user_id']) ? sanitize_text_field($_POST['line_user_id']) : '';
         $line_display_name = isset($_POST['line_display_name']) ? sanitize_text_field($_POST['line_display_name']) : '';
         $line_picture_url = isset($_POST['line_picture_url']) ? esc_url_raw($_POST['line_picture_url']) : '';
+        $line_email = isset($_POST['line_email']) ? sanitize_email($_POST['line_email']) : '';
         $access_token = isset($_POST['access_token']) ? sanitize_text_field($_POST['access_token']) : '';
         
         if (empty($line_user_id)) {
@@ -99,7 +100,7 @@ class WLM_Line_Login {
         WLM_User_Data_Handler::save_line_user_data($user_id, $line_user_id, $line_display_name, $line_picture_url);
         
         // 更新 WordPress 用戶資料（email 和頭像）
-        self::update_wordpress_user_profile($user_id, $line_display_name, $line_picture_url, $access_token);
+        self::update_wordpress_user_profile($user_id, $line_display_name, $line_picture_url, $access_token, $line_email);
         
         // WordPress 登入
         wp_set_current_user($user_id);
@@ -278,9 +279,10 @@ class WLM_Line_Login {
      * @param string $display_name      LINE 顯示名稱
      * @param string $picture_url       LINE 頭像 URL
      * @param string $access_token      LINE Access Token（用於獲取 email）
+     * @param string $line_email        LINE Email（從 ID Token 獲取）
      * @return void
      */
-    private static function update_wordpress_user_profile($user_id, $display_name, $picture_url, $access_token = '') {
+    private static function update_wordpress_user_profile($user_id, $display_name, $picture_url, $access_token = '', $line_email = '') {
         $user_data = array('ID' => $user_id);
         
         // 更新顯示名稱
@@ -288,14 +290,23 @@ class WLM_Line_Login {
             $user_data['display_name'] = $display_name;
         }
         
-        // 嘗試從 LINE API 獲取 email（如果有的話）
-        if (!empty($access_token)) {
-            $line_email = self::get_line_user_email($access_token);
-            if (!empty($line_email) && is_email($line_email)) {
-                // 檢查 email 是否已被其他用戶使用
-                $existing_user = get_user_by('email', $line_email);
-                if (!$existing_user || $existing_user->ID == $user_id) {
-                    $user_data['user_email'] = $line_email;
+        // 優先使用從 ID Token 獲取的 email
+        if (!empty($line_email) && is_email($line_email)) {
+            // 檢查 email 是否已被其他用戶使用
+            $existing_user = get_user_by('email', $line_email);
+            if (!$existing_user || $existing_user->ID == $user_id) {
+                $user_data['user_email'] = $line_email;
+            }
+        } else {
+            // 如果 ID Token 沒有 email，嘗試從 LINE API 獲取
+            if (!empty($access_token)) {
+                $api_email = self::get_line_user_email($access_token);
+                if (!empty($api_email) && is_email($api_email)) {
+                    // 檢查 email 是否已被其他用戶使用
+                    $existing_user = get_user_by('email', $api_email);
+                    if (!$existing_user || $existing_user->ID == $user_id) {
+                        $user_data['user_email'] = $api_email;
+                    }
                 }
             }
         }

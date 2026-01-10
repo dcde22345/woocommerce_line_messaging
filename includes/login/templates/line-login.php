@@ -115,11 +115,13 @@ if (!defined('ABSPATH')) {
                         return;
                     }
                     
-                    // 初始化 LIFF
-                    await liff.init({ liffId: liffId });
+                    // 初始化 LIFF（請求 email scope）
+                    await liff.init({ 
+                        liffId: liffId
+                    });
                     
                     if (!liff.isLoggedIn()) {
-                        // 如果未登入，導向 LINE 登入頁面
+                        // 如果未登入，導向 LINE 登入頁面（請求 email scope）
                         liff.login({
                             redirectUri: window.location.href
                         });
@@ -129,11 +131,27 @@ if (!defined('ABSPATH')) {
                     // 獲取 LINE Profile
                     const profile = await liff.getProfile();
                     
+                    // 嘗試從 ID Token 獲取 email（如果可用）
+                    let lineEmail = null;
+                    try {
+                        const idToken = liff.getIDToken();
+                        if (idToken) {
+                            // 解碼 ID Token 獲取 email
+                            const decodedToken = await liff.getDecodedIDToken();
+                            if (decodedToken && decodedToken.email) {
+                                lineEmail = decodedToken.email;
+                            }
+                        }
+                    } catch (e) {
+                        // ID Token 可能不包含 email，繼續使用其他方法
+                        console.log('[WLM] 無法從 ID Token 獲取 email:', e.message);
+                    }
+                    
                     // 獲取 Access Token
                     const accessToken = liff.getAccessToken();
                     
-                    // 發送到後端處理
-                    await sendToBackend(profile, accessToken);
+                    // 發送到後端處理（傳遞 email）
+                    await sendToBackend(profile, accessToken, lineEmail);
                     
                 } catch (error) {
                     console.error('LIFF Error:', error);
@@ -141,7 +159,7 @@ if (!defined('ABSPATH')) {
                 }
             }
             
-            async function sendToBackend(profile, accessToken) {
+            async function sendToBackend(profile, accessToken, lineEmail) {
                 try {
                     updateStatus('正在處理登入資訊...', 'loading');
                     
@@ -150,6 +168,7 @@ if (!defined('ABSPATH')) {
                         line_user_id: profile.userId,
                         line_display_name: profile.displayName || '',
                         line_picture_url: profile.pictureUrl || '',
+                        line_email: lineEmail || '',
                         access_token: accessToken || '',
                         nonce: nonce
                     });
